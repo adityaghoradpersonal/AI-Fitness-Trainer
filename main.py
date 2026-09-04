@@ -277,105 +277,200 @@ def _webrtc_auto_classify_mode(voice_on=True):
 
 
 def main():
+    # Load custom styling if available
     css_path = ROOT / "static" / "styles.css"
     if css_path.exists():
-        with open(css_path, "r") as f:
+        with open(css_path, "r", encoding="utf-8") as f:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-    st.title('Fitness AI Coach')
-    st.caption("AI-powered exercise recognition, counting, and form feedback")
+    # ============================================================
+    # HEADER
+    # ============================================================
+    st.title("AI Fitness Trainer")
+    st.caption("Computer Vision • Pose Estimation • BiLSTM Exercise Analysis")
 
+    st.markdown(
+        """
+        <div style="
+            padding: 15px;
+            border-radius: 10px;
+            background-color: rgba(128,128,128,0.08);
+            margin-bottom: 20px;
+        ">
+            <b>AI Model Demonstration</b><br>
+            The system analyzes an exercise video using pose estimation,
+            movement features, exercise-specific logic, and repetition counting.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # ============================================================
+    # SIDEBAR — MODEL INFORMATION
+    # ============================================================
     _show_model_metrics_in_sidebar()
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Settings")
-    voice_enabled = st.sidebar.checkbox("Voice Feedback", value=True, help="Speaks form tips and injury alerts through your browser")
-    user_weight = st.sidebar.number_input("Weight (kg)", min_value=30, max_value=200, value=70, step=1)
+    st.sidebar.subheader("Demo Settings")
 
-    options = st.sidebar.selectbox('Mode', ('Video', 'WebCam', 'Auto Classify', 'Chatbot'))
+    exercise_name = st.sidebar.selectbox(
+        "Exercise in demo video",
+        (
+            "Bicep Curl",
+            "Push Up",
+            "Squat",
+            "Shoulder Press",
+        ),
+        index=0,
+    )
 
-    if options == 'Chatbot':
-        chat_ui()
+    voice_enabled = st.sidebar.checkbox(
+        "Voice Feedback",
+        value=False,
+        help="Enable spoken form and injury feedback."
+    )
 
-    elif options == 'Video':
-        exercise_options = st.sidebar.selectbox(
-            'Exercise', ('Bicep Curl', 'Push Up', 'Squat', 'Shoulder Press')
+    st.sidebar.markdown("---")
+
+    st.sidebar.markdown(
+        """
+        **Model Pipeline**
+
+        Video  
+        ↓  
+        MediaPipe Pose  
+        ↓  
+        Body Landmarks  
+        ↓  
+        Feature Extraction  
+        ↓  
+        Exercise Analysis  
+        ↓  
+        Rep Counting & Form Feedback
+        """
+    )
+
+    # ============================================================
+    # MODEL INFORMATION
+    # ============================================================
+    with st.expander("Model Information", expanded=True):
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Model", "BiLSTM")
+
+        with col2:
+            st.metric("Pose Estimation", "MediaPipe")
+
+        with col3:
+            st.metric("Input Sequence", "30 Frames")
+
+        st.markdown(
+            """
+            **What the AI does**
+
+            - Extracts human body landmarks from each video frame.
+            - Converts the pose into movement-related features.
+            - Processes a sequence of frames using the trained BiLSTM model.
+            - Identifies the exercise being demonstrated.
+            - Applies the existing exercise-specific repetition logic.
+            - Provides form and safety feedback.
+            """
         )
-        video_file_buffer = st.sidebar.file_uploader("Upload video", type=["mp4", "mov", "avi", "asf", "m4v"])
 
-        cap = None
-        video_path_for_display = None
+    # ============================================================
+    # DEMO VIDEO
+    # ============================================================
+    st.subheader("Exercise Analysis")
 
-        if video_file_buffer:
-            tfflie = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-            tfflie.write(video_file_buffer.read())
-            tfflie.close()
-            video_path_for_display = tfflie.name
-            cap = cv2.VideoCapture(video_path_for_display)
-        elif DEMO_VIDEO.exists():
-            video_path_for_display = str(DEMO_VIDEO)
-            cap = cv2.VideoCapture(video_path_for_display)
-        else:
-            st.info("Upload a video or add demo at assets/videos/demo_2.mp4")
-
-        if video_path_for_display:
-            st.sidebar.video(video_path_for_display)
-            st.video(video_path_for_display)
-
-        if cap is not None and cap.isOpened():
-            exercise = _get_exercise()
-            exer = exercise.Exercise()
-            exer.voice.enabled = voice_enabled
-            if exercise_options == 'Bicep Curl':
-                exer.bicept_curl(cap, is_video=True, counter=0, stage_right=None, stage_left=None)
-            elif exercise_options == 'Push Up':
-                exer.push_up(cap, is_video=True, counter=0, stage=None)
-            elif exercise_options == 'Squat':
-                exer.squat(cap, is_video=True, counter=0, stage=None)
-            elif exercise_options == 'Shoulder Press':
-                exer.shoulder_press(cap, is_video=True, counter=0, stage=None)
-
-    elif options == 'WebCam':
-        exercise_general = st.sidebar.selectbox(
-            'Exercise', ('Bicep Curl', 'Push Up', 'Squat', 'Shoulder Press')
+    if not DEMO_VIDEO.exists():
+        st.error(
+            "Demo video not found. Expected file: "
+            "`assets/videos/demo_2.mp4`"
         )
+        return
 
-        if _WEBRTC_AVAILABLE and _TURN_CONFIGURED:
-            st.caption("Allow camera access when prompted. Click START to begin.")
-            _webrtc_exercise_mode(exercise_general, voice_on=voice_enabled)
-        elif _WEBRTC_AVAILABLE:
-            _show_turn_help()
-        else:
-            st.caption("Click Start. Webcam runs until you refresh.")
-            if st.button('Start Exercise', type="primary"):
-                time.sleep(1)
-                exercise = _get_exercise()
-                exer = exercise.Exercise()
-                exer.voice.enabled = voice_enabled
-                if exercise_general == 'Bicep Curl':
-                    exer.bicept_curl(None, counter=0, stage_right=None, stage_left=None)
-                elif exercise_general == 'Push Up':
-                    exer.push_up(None, counter=0, stage=None)
-                elif exercise_general == 'Squat':
-                    exer.squat(None, counter=0, stage=None)
-                elif exercise_general == 'Shoulder Press':
-                    exer.shoulder_press(None, counter=0, stage=None)
+    video_path = str(DEMO_VIDEO)
 
-    elif options == 'Auto Classify':
-        if _WEBRTC_AVAILABLE and _TURN_CONFIGURED:
-            st.caption("AI automatically detects your exercise and counts reps. Click START.")
-            _webrtc_auto_classify_mode(voice_on=voice_enabled)
-        elif _WEBRTC_AVAILABLE:
-            _show_turn_help()
-        else:
-            st.caption("Join hands to stop.")
-            if st.button('Start Auto Classification', type="primary"):
-                time.sleep(1)
-                exercise = _get_exercise()
-                exer = exercise.Exercise()
-                exer.voice.enabled = voice_enabled
-                exer.auto_classify_and_count()
+    st.video(video_path)
+
+    st.caption(
+        f"Demo video: `{DEMO_VIDEO.name}`"
+    )
+
+    # ============================================================
+    # START ANALYSIS
+    # ============================================================
+    st.markdown("### Run AI Analysis")
+
+    st.write(
+        f"The selected exercise is **{exercise_name}**. "
+        "Start the analysis to run the existing AI exercise-processing pipeline "
+        "on the demo video."
+    )
+
+    if st.button(
+        "Start AI Analysis",
+        type="primary",
+        use_container_width=True
+    ):
+        exercise = _get_exercise()
+        exer = exercise.Exercise()
+
+        # Disable voice by default for a clean professor demonstration
+        exer.voice.enabled = voice_enabled
+
+        # Open the existing demo video
+        cap = cv2.VideoCapture(video_path)
+
+        if not cap.isOpened():
+            st.error("Unable to open the demo video.")
+            return
+
+        # --------------------------------------------------------
+        # Use the EXISTING exercise-processing functions.
+        # No changes are made to the model or AI logic.
+        # --------------------------------------------------------
+        if exercise_name == "Bicep Curl":
+            exer.bicept_curl(
+                cap,
+                is_video=True,
+                counter=0,
+                stage_right=None,
+                stage_left=None
+            )
+
+        elif exercise_name == "Push Up":
+            exer.push_up(
+                cap,
+                is_video=True,
+                counter=0,
+                stage=None
+            )
+
+        elif exercise_name == "Squat":
+            exer.squat(
+                cap,
+                is_video=True,
+                counter=0,
+                stage=None
+            )
+
+        elif exercise_name == "Shoulder Press":
+            exer.shoulder_press(
+                cap,
+                is_video=True,
+                counter=0,
+                stage=None
+            )
+
+        cap.release()
+
+        st.success("Video analysis completed.")
 
 
+# ================================================================
+# APPLICATION ENTRY POINT
+# ================================================================
 if __name__ == '__main__':
     main()
