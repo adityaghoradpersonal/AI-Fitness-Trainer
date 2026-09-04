@@ -51,7 +51,7 @@ python3.10 -m venv .venv
 Activate it:
 
 ```bash
-source .venv/bin/activate
+source venv/bin/activate
 ```
 
 After activation, your terminal should show something similar to:
