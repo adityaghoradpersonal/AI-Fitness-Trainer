@@ -15,7 +15,7 @@ Python 3.10 is recommended because the project dependencies were developed/teste
 Open a terminal and run:
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/adityaghoradpersonal/AI-Fitness-Trainer.git
 ```
 
 Then enter the project directory:
